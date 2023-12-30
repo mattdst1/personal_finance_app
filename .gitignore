@@ -160,3 +160,6 @@ cython_debug/
 #.idea/
 
 *.csv
+*.env
+video-intelligence-379918-e27402ee9249.json
+data/
