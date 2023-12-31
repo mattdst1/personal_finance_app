@@ -49,6 +49,10 @@ class Transaction:
     value_date: str = None
     value_date_time: str = None
 
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
+
 
 class Account:
     def __init__(
@@ -57,8 +61,8 @@ class Account:
         account_type: str,
         currency: str,
         reference_date: str = None,
-        interim_available: float = None,
-        interim_booked: float = None,
+        interim_available_balance: float = None,
+        interim_booked_balance: float = None,
         account_id: str = None,
         forward_available: float = None,
         opening_cleared: float = None,
@@ -68,10 +72,10 @@ class Account:
         self.account_name = account_name
         self.account_id = account_id
         self.account_type = account_type
-        self.interim_available = interim_available
+        self.interim_available = interim_available_balance
         self.currency = currency
         self.reference_date = reference_date
-        self.interim_booked = interim_booked
+        self.interim_booked = interim_booked_balance
         self.forward_available = forward_available
         self.opening_cleared = opening_cleared
         self.previously_closed_booked = previously_closed_booked
@@ -79,6 +83,10 @@ class Account:
 
         self.pending_transactions = []
         self.booked_transactions = []
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)
 
     def __repr__(self):
         return f"Account='{self.account_name}' Id:={self.account_id} InterimBalance={self.interim_available} "
