@@ -1,26 +1,18 @@
 from dataclasses import dataclass
+import dataclasses
 import datetime
 from enum import Enum
-
+from copy import copy
 
 from dotenv import load_dotenv
 
 load_dotenv("user.env")
 
-
-class TransactionStatus(Enum):
-    """
-    Transaction status: may be booked or pending
-
-    """
-
-    booked = "booked"
-    pending = "pending"
+BOOKED_TRANSACTION = "booked"
+PENDING_TRANSACTION = "pending"
 
 
 # Transaction class
-
-
 @dataclass
 class Transaction:
     booking_date: str = None
@@ -49,9 +41,47 @@ class Transaction:
     value_date: str = None
     value_date_time: str = None
 
+    def enforce_types(self):
+        # convert str to float
+        if self.amount:
+            self.amount = float(self.amount)
+        if self.instructed_amount:
+            self.instructed_amount = float(self.instructed_amount)
+        if self.exchange_rate:
+            self.exchange_rate = float(self.exchange_rate)
+
+        # convert str to datetime, if not None
+        if self.booking_date:
+            self.booking_date = datetime.datetime.strptime(
+                self.booking_date, "%Y-%m-%d"
+            ).date()
+        if self.value_date:
+            self.value_date = datetime.datetime.strptime(
+                self.value_date, "%Y-%m-%d"
+            ).date()
+        if self.quotation_date:
+            self.quotation_date = datetime.datetime.strptime(
+                self.quotation_date, "%Y-%m-%d"
+            ).date()
+
+    def __post_init__(self):
+        self.enforce_types()
+
     @classmethod
     def from_dict(cls, data):
         return cls(**data)
+
+    # return as dict
+    def to_dict(self):
+        # datetime to str
+        if self.booking_date:
+            self.booking_date = self.booking_date.strftime("%Y-%m-%d")
+        if self.value_date:
+            self.value_date = self.value_date.strftime("%Y-%m-%d")
+        if self.quotation_date:
+            self.quotation_date = self.quotation_date.strftime("%Y-%m-%d")
+
+        return copy(self.__dict__)
 
 
 class Account:
@@ -88,6 +118,18 @@ class Account:
     def from_dict(cls, data):
         return cls(**data)
 
+    def to_dict(self):
+        dict_data = copy(self.__dict__)
+
+        # turn each transaction into a dict
+        dict_data["pending_transactions"] = [
+            t.to_dict() for t in self.pending_transactions
+        ]
+        dict_data["booked_transactions"] = [
+            t.to_dict() for t in self.booked_transactions
+        ]
+        return dict_data
+
     def __repr__(self):
         return f"Account='{self.account_name}' Id:={self.account_id} InterimBalance={self.interim_available} "
 
@@ -107,16 +149,16 @@ class Account:
                 self.pending_transactions.remove(t)
                 break
 
-        if transaction.status == TransactionStatus.booked:
+        if transaction.status == BOOKED_TRANSACTION:
             self.booked_transactions.append(transaction)
-        else:
+        elif transaction:
             self.pending_transactions.append(transaction)
-
-    def get_transactions(self, status: TransactionStatus):
-        if status == TransactionStatus.booked:
-            return self.booked_transactions
         else:
-            return self.pending_transactions
+            raise ValueError(f"Transaction status {transaction.status} is not valid")
+
+    def add_transactions(self, transactions: list):
+        for transaction in transactions:
+            self.add_transaction(transaction)
 
 
 class User:

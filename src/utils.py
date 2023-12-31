@@ -50,3 +50,23 @@ def clean_column_names(data):
         cleaned_data = [clean(entry) for entry in data]
 
     return cleaned_data
+
+
+def flatten_and_remove_duplicates_from_dictionary(data):
+    flattened_data = []
+    seen = set()
+
+    for entry in data:
+        flattened_entry = {}
+        for key, value in entry.items():
+            if isinstance(value, dict):
+                flattened_entry.update(value)
+            else:
+                flattened_entry[key] = value
+
+        flattened_tuple = tuple(flattened_entry.items())
+        if flattened_tuple not in seen:
+            seen.add(flattened_tuple)
+            flattened_data.append(flattened_entry)
+
+    return flattened_data
