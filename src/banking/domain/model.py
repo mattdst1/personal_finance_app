@@ -51,17 +51,27 @@ class Transaction:
             self.exchange_rate = float(self.exchange_rate)
 
         # convert str to datetime, if not None
-        if self.booking_date:
+        if isinstance(self.booking_date, str):
             self.booking_date = datetime.datetime.strptime(
                 self.booking_date, "%Y-%m-%d"
             ).date()
-        if self.value_date:
+        if isinstance(self.value_date, str):
             self.value_date = datetime.datetime.strptime(
                 self.value_date, "%Y-%m-%d"
             ).date()
-        if self.quotation_date:
+
+        if isinstance(self.value_date_time, str):
+            self.value_date_time = datetime.datetime.strptime(
+                self.value_date_time, "%Y-%m-%dT%H:%M:%SZ"
+            ).date()
+        if isinstance(self.booking_date_time, str):
+            self.booking_date_time = datetime.datetime.strptime(
+                self.booking_date_time, "%Y-%m-%dT%H:%M:%SZ"
+            ).date()
+
+        if isinstance(self.quotation_date, str):
             self.quotation_date = datetime.datetime.strptime(
-                self.quotation_date, "%Y-%m-%d"
+                self.quotation_date, "%Y-%m-%dT%H:%M:%SZ"
             ).date()
 
     def __post_init__(self):
@@ -79,8 +89,17 @@ class Transaction:
         if self.value_date:
             self.value_date = self.value_date.strftime("%Y-%m-%d")
         if self.quotation_date:
-            self.quotation_date = self.quotation_date.strftime("%Y-%m-%d")
+            self.quotation_date = datetime.strptime(
+                self.quotation_date, "%Y-%m-%dT%H:%M:%SZ"
+            ).date()
+        if self.value_date_time:
+            self.value_date_time = self.value_date_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if self.booking_date_time:
+            self.booking_date_time = self.booking_date_time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
 
+        # remove None values
         return copy(self.__dict__)
 
 
@@ -94,9 +113,9 @@ class Account:
         interim_available_balance: float = None,
         interim_booked_balance: float = None,
         account_id: str = None,
-        forward_available: float = None,
-        opening_cleared: float = None,
-        previously_closed_booked: float = None,
+        forward_available_balance: float = None,
+        opening_cleared_balance: float = None,
+        previously_closed_booked_balance: float = None,
         masked_pan: str = None,
     ):
         self.account_name = account_name
@@ -106,9 +125,9 @@ class Account:
         self.currency = currency
         self.reference_date = reference_date
         self.interim_booked = interim_booked_balance
-        self.forward_available = forward_available
-        self.opening_cleared = opening_cleared
-        self.previously_closed_booked = previously_closed_booked
+        self.forward_available = forward_available_balance
+        self.opening_cleared = opening_cleared_balance
+        self.previously_closed_booked = previously_closed_booked_balance
         self.masked_pan = masked_pan
 
         self.pending_transactions = []
