@@ -248,9 +248,10 @@ class CreditCard(Account):
 
 
 class User:
-    def __init__(self):
-        self.bank_accounts = []
-        self.credit_cards = []
+    def __init__(self, name: str = "Matthew Stewart"):
+        self.bank_accounts: list[BankAccount] = []
+        self.credit_cards: list[CreditCard] = []
+        self.name = name
 
     def add_account(self, account: Account):
         if isinstance(account, BankAccount):
