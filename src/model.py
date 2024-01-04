@@ -248,10 +248,10 @@ class CreditCard(Account):
 
 
 class User:
-    def __init__(self, name: str = "Matthew Stewart"):
+    def __init__(self, user_name: str = "Matthew Stewart"):
+        self.user_name = user_name
         self.bank_accounts: list[BankAccount] = []
         self.credit_cards: list[CreditCard] = []
-        self.name = name
 
     def add_account(self, account: Account):
         if isinstance(account, BankAccount):
@@ -269,9 +269,9 @@ class User:
     def accounts(self):
         return self.bank_accounts + self.credit_cards
 
-    @property
-    def name(self):
-        return self.bank_accounts[0].account_name
+    # @property
+    # def user_name(self):
+    #     return self.bank_accounts[0].account_name
 
     @property
     def currency(self):
@@ -288,10 +288,10 @@ class User:
         return None
 
     def __repr__(self):
-        return f"User: {self.name} Accounts: {self.accounts}"
+        return f"User: {self.user_name} Accounts: {self.accounts}"
 
     def __str__(self) -> str:
-        return f"User: {self.name} Accounts: {self.accounts}"
+        return f"User: {self.user_name} Accounts: {self.accounts}"
 
     def to_dict(self):
         # need to copy each account into  a dict
