@@ -4,7 +4,7 @@ import datetime
 from enum import Enum
 from copy import copy
 from collections import OrderedDict
-
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv("user.env")
@@ -410,6 +410,50 @@ class User:
         return transactions
 
 
+class AccountMetadata(BaseModel):
+    id: str
+    created: str
+    last_accessed: str
+    iban: str
+    institution_id: str
+    status: str
+    owner_name: str
+
+
+class UserAccountMetadata(BaseModel):
+    accounts: dict[str, AccountMetadata]
+
+
+class Requisition(BaseModel):
+    id: str
+    created: str
+    redirect: str
+    accounts: list[str]
+    status: str
+    institution_id: str
+    agreement: str
+    reference: str
+    link: str
+
+    @property
+    def expiry_date(self):
+        # permissions expire 90 days after creation
+        # need to turn created into datetime
+
+        date = datetime.datetime.strptime(
+            "2023-12-25T09:33:37.022127Z", "%Y-%m-%dT%H:%M:%S.%fZ"
+        )
+        return date + datetime.timedelta(days=90)
+
+    @property
+    def link_expired(self):
+        return datetime.datetime.now() > self.expiry_date
+
+    @property
+    def is_live(self):
+        return not self.link_expired
+
+
 def find_common_dicts(*lists):
     def dict_to_ordered_tuple(d):
         return tuple(OrderedDict(sorted(d.items())).items())
@@ -420,3 +464,43 @@ def find_common_dicts(*lists):
 
     result = [dict(t) for t in common_set]
     return result
+
+
+class CurrentAccountDetails(BaseModel):
+    resourceId: str
+    bban: str
+    currency: str
+    name: str
+    cashAccountType: str
+
+
+class CreditCardDetails(BaseModel):
+    resourceId: str
+    currency: str
+    maskedPan: str
+    details: str
+
+
+class UserAccountDetails:
+    credit_cards: list[CreditCardDetails]
+    current_accounts: list[CurrentAccountDetails]
+
+
+class BalanceAmount(BaseModel):
+    amount: str
+    currency: str
+
+
+class Balance(BaseModel):
+    balance_amount: BalanceAmount
+    balance_type: str
+    reference_date: str
+
+
+class Balances(BaseModel):
+    balances: list[Balance]
+
+
+class UserAccountBalances:
+    current_accounts: dict[str, Balances]
+    credit_cards: dict[str, Balances]
