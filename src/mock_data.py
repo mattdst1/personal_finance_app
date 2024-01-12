@@ -111,6 +111,37 @@ def get_mocked_data():
                 "cashAccountType": "CACC",
             }
         }
+        # rename
+        joint_account_details = utils.rename_keys(
+            joint_account_details.get("account"),
+            {
+                "resourceId": utils.to_snake_case_with_dots("resourceId"),
+                "bban": utils.to_snake_case_with_dots("bban"),
+                "currency": utils.to_snake_case_with_dots("currency"),
+                "name": utils.to_snake_case_with_dots("name"),
+                "cashAccountType": utils.to_snake_case_with_dots("cashAccountType"),
+            },
+        )
+        credit_card_details = utils.rename_keys(
+            credit_card_details.get("account"),
+            {
+                "resourceId": utils.to_snake_case_with_dots("resourceId"),
+                "currency": utils.to_snake_case_with_dots("currency"),
+                "cashAccountType": utils.to_snake_case_with_dots("cashAccountType"),
+                "maskedPan": utils.to_snake_case_with_dots("maskedPan"),
+                "details": utils.to_snake_case_with_dots("details"),
+            },
+        )
+        single_account_details = utils.rename_keys(
+            single_account_details.get("account"),
+            {
+                "resourceId": utils.to_snake_case_with_dots("resourceId"),
+                "bban": utils.to_snake_case_with_dots("bban"),
+                "currency": utils.to_snake_case_with_dots("currency"),
+                "name": utils.to_snake_case_with_dots("name"),
+                "cashAccountType": utils.to_snake_case_with_dots("cashAccountType"),
+            },
+        )
 
         # as objects
         joint_account_details = model.CurrentAccountDetails.model_validate(
@@ -123,14 +154,26 @@ def get_mocked_data():
             single_account_details
         )
 
-        account_details = model.UserAccountDetails(
-            credit_cards=[credit_card_details],
-            current_accounts=[joint_account_details, single_account_details],
-        )
+        account_details = model.UserAccountDetails()
+        account_details.add_credit_card(credit_card_details)
+        account_details.add_current_account(joint_account_details)
+        account_details.add_current_account(single_account_details)
         return account_details
 
     def get_balances():
         # as dict
+        def get_balances(balance_data):
+            return [model.Balance.model_validate(balance) for balance in balance_data]
+
+        class BalanceAmount(BaseModel):
+            amount: str
+            currency: str
+
+        class Balance(BaseModel):
+            balance_amount: BalanceAmount
+            balance_type: str
+            reference_date: str
+
         joint_account_balances = {
             "balances": [
                 {
@@ -186,13 +229,42 @@ def get_mocked_data():
             ]
         }
 
-          # as objects
-        joint_account_balances = model.UserAccountBalances.model_validate(
-            joint_account_balances
+        # rename
+
+        joint_account_balances = utils.rename_keys(
+            joint_account_balances.get("balances"),
+            {
+                "balanceAmount": utils.to_snake_case_with_dots("balanceAmount"),
+                "balanceType": utils.to_snake_case_with_dots("balanceType"),
+                "referenceDate": utils.to_snake_case_with_dots("referenceDate"),
+            },
         )
-        credit_card_balances = model.UserAccountBalances.model_validate(credit_card_balances)
-        single_account_balances = model.UserAccountBalances.model_validate(
-            single_account_balances
+        credit_card_balances = utils.rename_keys(
+            credit_card_balances.get("balances"),
+            {
+                "balanceAmount": utils.to_snake_case_with_dots("balanceAmount"),
+                "balanceType": utils.to_snake_case_with_dots("balanceType"),
+                "referenceDate": utils.to_snake_case_with_dots("referenceDate"),
+            },
+        )
+        single_account_balances = utils.rename_keys(
+            single_account_balances.get("balances"),
+            {
+                "balanceAmount": utils.to_snake_case_with_dots("balanceAmount"),
+                "balanceType": utils.to_snake_case_with_dots("balanceType"),
+                "referenceDate": utils.to_snake_case_with_dots("referenceDate"),
+            },
+        )
+
+        # as objects
+        joint_account_balances = model.Balances(
+            balances=get_balances(joint_account_balances)
+        )
+        credit_card_balances = model.Balances(
+            balances=get_balances(credit_card_balances)
+        )
+        single_account_balances = model.Balances(
+            balances=get_balances(single_account_balances)
         )
 
         account_balances = model.UserAccountBalances(
@@ -201,10 +273,32 @@ def get_mocked_data():
         )
         return account_balances
 
+    def get_account_id_mapping():
+        account_id_mapping = {
+            "590300bd-3daf-4d5e-9274-7a3782261f7e": "joint account",
+            "d2ff77d0-6c80-4580-95a5-e3e87a098db9": "STAFF ALL IN ONE CREDIT CARD",
+            "e9e5f8b9-da61-49ce-bdae-56546ce4a1c9": "single account",
+        }
+        return account_id_mapping
+
     requisition = get_requisition()
     account_metadata = get_metadata()
     account_details = get_details()
     account_balances = get_balances()
     transactions_raw = utils.read_json("../data/output.json").get("data")
+    # print(transactions_raw[0:1])
+    # transactions = [
+    #     model.Transaction.model_validate(transaction)
+    #     for transaction in transactions_raw
+    # ]
 
-    return requisition, transactions_raw, account_details
+    account_id_mapping = get_account_id_mapping()
+
+    user_data = model.UserData(
+        requisition=requisition,
+        account_metadata=account_metadata,
+        account_details=account_details,
+        account_balances=account_balances,
+        # transactions=transactions_raw,
+    )
+    return user_data, transactions_raw, account_id_mapping

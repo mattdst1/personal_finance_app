@@ -70,3 +70,35 @@ def flatten_and_remove_duplicates_from_dictionary(data):
             flattened_data.append(flattened_entry)
 
     return flattened_data
+
+
+def rename_keys(data, mapping):
+    """
+    Renames keys in a dictionary according to a mapping.
+
+    Args:
+        data (dict): The dictionary to rename keys in.
+        mapping (dict): The mapping from old keys to new keys.
+
+    Returns:
+        dict: The dictionary with the keys renamed.
+    """
+
+    # if isinstance list[dict] apply to each dict in list
+    if isinstance(data, list):
+        for d in data:
+            rename_keys(d, mapping)
+        return data
+
+    # Check that the data is a dictionary
+
+    if not isinstance(data, dict):
+        raise ValueError("data must be a dictionary")
+
+    if not isinstance(mapping, dict):
+        raise ValueError("mapping must be a dictionary")
+
+    # Rename the keys
+    for key, value in mapping.items():
+        data[value] = data.pop(key)
+    return data

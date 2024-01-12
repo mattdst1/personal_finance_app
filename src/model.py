@@ -4,7 +4,8 @@ import datetime
 from enum import Enum
 from copy import copy
 from collections import OrderedDict
-from pydantic import BaseModel
+from numpy import isin
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 load_dotenv("user.env")
@@ -467,23 +468,62 @@ def find_common_dicts(*lists):
 
 
 class CurrentAccountDetails(BaseModel):
-    resourceId: str
+    """
+    Model for current account details.
+
+    Args:
+        resource_id (str): The resource ID of the current account.
+        bban (str): The BBAN of the current account.
+        currency (str): The currency of the current account.
+        name (str): The name of the current account.
+        cash_account_type (str): The cash account type of the current account.
+    """
+
+    resource_id: str
     bban: str
     currency: str
     name: str
-    cashAccountType: str
+    cash_account_type: str
 
 
 class CreditCardDetails(BaseModel):
-    resourceId: str
+    """
+    Model for credit card details.
+
+    Args:
+        resource_id (str): The resource ID of the credit card.
+        currency (str): The currency of the credit card.
+        masked_pan (str): The masked PAN of the credit card.
+        details (str): The details of the credit card.
+    """
+
+    resource_id: str
     currency: str
-    maskedPan: str
+    masked_pan: str
     details: str
 
 
-class UserAccountDetails:
-    credit_cards: list[CreditCardDetails]
-    current_accounts: list[CurrentAccountDetails]
+class UserAccountDetails(BaseModel):
+    """
+    Model for user account details.
+
+    Args:
+        credit_cards (list[CreditCardDetails]): A list of credit card details.
+        current_accounts (list[CurrentAccountDetails]): A list of current account details.
+    """
+
+    credit_cards: list[CreditCardDetails] = Field(default_factory=list)
+    current_accounts: list[CurrentAccountDetails] = Field(default_factory=list)
+
+    def add_credit_card(self, credit_card: CreditCardDetails):
+        if not isinstance(credit_card, CreditCardDetails):
+            raise TypeError("credit_card must be of type CreditCardDetails")
+        self.credit_cards.append(credit_card)
+
+    def add_current_account(self, current_account: CurrentAccountDetails):
+        if not isinstance(current_account, CurrentAccountDetails):
+            raise TypeError("current_account must be of type CurrentAccountDetails")
+        self.current_accounts.append(current_account)
 
 
 class BalanceAmount(BaseModel):
@@ -501,6 +541,14 @@ class Balances(BaseModel):
     balances: list[Balance]
 
 
-class UserAccountBalances:
-    current_accounts: dict[str, Balances]
-    credit_cards: dict[str, Balances]
+class UserAccountBalances(BaseModel):
+    current_accounts: dict[str, Balances] = Field(default_factory=dict)
+    credit_cards: dict[str, Balances] = Field(default_factory=dict)
+
+
+class UserData(BaseModel):
+    requisition: Requisition
+    account_metadata: UserAccountMetadata
+    account_details: UserAccountDetails
+    account_balances: UserAccountBalances
+    transactions: list[dict] = Field(default_factory=lambda: [])
