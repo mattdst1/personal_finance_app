@@ -1,37 +1,70 @@
+from pathlib import Path
+
 import mock_data
+import data_parsers
 import model
 
-# user_data, transactions, _account_mapping = mock_data.get_mocked_data()
 
-# account_mapping = {
-#     "590300bd-3daf-4d5e-9274-7a3782261f7e": "joint account",
-#     "d2ff77d0-6c80-4580-95a5-e3e87a098db9": "STAFF ALL IN ONE CREDIT CARD",
-#     "e9e5f8b9-da61-49ce-bdae-56546ce4a1c9": "single account",
-# }
+def load_user_data(filepath: Path = mock_data.MOCK_PATH):
+    # user level
+    data, requisition = mock_data.load_data(data_filepath=filepath)
+    metadata = model.UserAccountMetadata(accounts={})
+    details = model.UserAccountDetails()
+    balances = model.UserAccountBalances()
+    transactions = []
+    # import an account
 
+    def parse_account_name(
+        account_details: model.CurrentAccountDetails | model.CreditCardDetails,
+    ):
+        if isinstance(account_details, model.CurrentAccountDetails):
+            account_name = account_details.name
+            return account_name
+        elif isinstance(account_details, model.CreditCardDetails):
+            account_name = account_details.details
+            return account_name
+        else:
+            raise ValueError(f"Unknown account type: {type(account_details)}")
 
-def set_account_ids(user_data: model.UserData, mapping: dict):
-    """
-    Set account IDs for user data based on mapping.
+    for account_id in requisition.accounts:
+        # read all data
+        account_data = data.get(account_id)
 
-    Args:
-        user_data (model.UserData): The user data to set account IDs for.
-        mapping (dict): The mapping of account IDs to account names.
-    """
+        # parse and validate
+        metadata.add_account(
+            account_id=account_id,
+            account_metadata=data_parsers.parse_metadata(account_data),
+        )
 
-    def invert_mapping(mapping):
-        # invert the mapping {key: name} to {name: key}
-        return {v: k for k, v in mapping.items()}
+        # parse details and account account name
+        parsed_account_details = data_parsers.parse_account_details(account_data)
+        account_name = parse_account_name(parsed_account_details)
 
-    def process_credit_cards(cards: list[model.CreditCardDetails], mapping: dict):
-        for card in cards:
-            card.account_id = mapping[card.details]
+        # update user details
+        details.add_account(
+            account_id=account_id,
+            account=parsed_account_details,
+        )
 
-    def process_current_accounts(accounts: list[model.CurrentAccountDetails], mapping):
-        current_account: model.CurrentAccountDetails
-        for account in user_data.account_details.current_accounts:
-            account.account_id = mapping[account.name]
+        # update user balances
+        balances.set_account_balances(
+            account_id=account_id,
+            balance=data_parsers.parse_account_balances(account_data),
+            account_name=account_name,
+        )
 
-    mapping = invert_mapping(mapping)
-    process_credit_cards(user_data.account_details.credit_cards, mapping)
-    process_current_accounts(user_data.account_details.current_accounts, mapping)
+        # update user transactions
+        account_transactions = data_parsers.parse_account_transactions(
+            account_data=account_data, account_id=account_id, account_name=account_name
+        )
+        transactions.extend(account_transactions)
+
+    user_data = model.UserData(
+        requisition=requisition,
+        account_metadata=metadata,
+        account_details=details,
+        account_balances=balances,
+        transactions=transactions,
+    )
+    # return user_data,  transactions
+    return user_data

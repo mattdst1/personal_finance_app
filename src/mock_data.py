@@ -3,9 +3,12 @@ import dataclasses
 import datetime
 import utils
 
+from pathlib import Path
 from pydantic import BaseModel, Field, Json
 
 import model
+
+MOCK_PATH = Path("../data/api_output_sample.json")
 
 
 def get_requisition() -> model.Requisition:
@@ -30,8 +33,8 @@ def get_requisition() -> model.Requisition:
     return model.Requisition.model_validate(requisition)
 
 
-def load_data():
-    return utils.read_json(filepath="../data/api_output_sample.json"), get_requisition()
+def load_data(data_filepath: Path = MOCK_PATH):
+    return utils.read_json(filepath=data_filepath), get_requisition()
 
 
 def get_mocked_data():

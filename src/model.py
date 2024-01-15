@@ -4,9 +4,11 @@ import datetime
 from enum import Enum
 from copy import copy, deepcopy
 from collections import OrderedDict
-from numpy import isin
-from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+
+from numpy import isin
+import pandas as pd
+from pydantic import BaseModel, Field
 
 load_dotenv("user.env")
 
@@ -116,303 +118,6 @@ class Transaction:
         return copy(copy_class.__dict__)
 
 
-class Account:
-    def __init__(
-        self,
-        account_name: str,
-        account_type: str,
-        currency: str,
-        reference_date: str = None,
-        interim_available_balance: float = None,
-        interim_booked_balance: float = None,
-        account_id: str = None,
-        forward_available_balance: float = None,
-        opening_cleared_balance: float = None,
-        previously_closed_booked_balance: float = None,
-        masked_pan: str = None,
-    ):
-        self.account_name = account_name
-        self.account_id = account_id
-        self.account_type = account_type
-        self.currency = currency
-        self.reference_date = reference_date
-        # all
-        self.pending_transactions = []
-        self.booked_transactions = []
-        # bank account
-        self.interim_booked = interim_booked_balance
-        self.interim_available = interim_available_balance
-        # credit card
-        self.forward_available = forward_available_balance
-        self.opening_cleared = opening_cleared_balance
-        self.previously_closed_booked = previously_closed_booked_balance
-        self.masked_pan = masked_pan
-        self.enforce_types()
-
-    # enforce types
-
-    def enforce_types(self):
-        # if available and not right type, turn strings into appropriate types
-        if self.interim_available and not isinstance(self.interim_available, float):
-            self.interim_available = float(self.interim_available)
-        if self.interim_booked and not isinstance(self.interim_booked, float):
-            self.interim_booked = float(self.interim_booked)
-        if self.forward_available and not isinstance(self.forward_available, float):
-            self.forward_available = float(self.forward_available)
-        if self.opening_cleared and not isinstance(self.opening_cleared, float):
-            self.opening_cleared = float(self.opening_cleared)
-        if self.previously_closed_booked and not isinstance(
-            self.previously_closed_booked, float
-        ):
-            self.previously_closed_booked = float(self.previously_closed_booked)
-
-    # return as dict
-
-    @classmethod
-    def from_dict(cls, data):
-        return cls(**data)
-
-    def to_dict(self):
-        dict_data = copy(self.__dict__)
-
-        # turn each transaction into a dict
-        dict_data["pending_transactions"] = [
-            t.to_dict() for t in self.pending_transactions
-        ]
-        dict_data["booked_transactions"] = [
-            t.to_dict() for t in self.booked_transactions
-        ]
-        return dict_data
-
-    def __repr__(self):
-        return f"Account='{self.account_name}' AccountType={self.account_type} Id:={self.account_id} InterimBalance={self.interim_available} "
-
-    def __str__(self) -> str:
-        return f"Account: {self.account_name} Id: ({self.account_id}) Interim balance: {self.interim_available} "
-
-    def add_transaction(self, transaction: Transaction):
-        # check that account_id are same
-        if transaction.account_id != self.account_id:
-            raise ValueError(
-                f"Transaction account_id {transaction.account_id} does not match account_id {self.account_id}"
-            )
-        # add metadata to transaction
-        transaction.account_name = self.account_name
-        transaction.account_type = self.account_type
-
-        # check transaction id: if exists, overwrite
-        for t in self.pending_transactions:
-            if t.transaction_id == transaction.transaction_id:
-                self.pending_transactions.remove(t)
-                break
-
-        if transaction.status == TransactionType.booked_transaction:
-            self.booked_transactions.append(transaction)
-        elif transaction.status == TransactionType.pending_transaction:
-            self.pending_transactions.append(transaction)
-        else:
-            raise ValueError(f"Transaction status {transaction.status} is not valid")
-
-    def add_transactions(self, transactions: list):
-        for transaction in transactions:
-            self.add_transaction(transaction)
-
-
-class BankAccount(Account):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.overdraft_limit = None
-
-    def __repr__(self):
-        return f"Account='{self.account_name}' AccountType={self.account_type} Id:={self.account_id} InterimBalance={self.interim_available} OverdraftLimit={self.overdraft_limit}"
-
-    def __str__(self) -> str:
-        return f"Account: {self.account_name} Id: ({self.account_id}) Interim balance: {self.interim_available} Overdraft Limit: {self.overdraft_limit}"
-
-
-class CreditCard(Account):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # calculate credit limit
-        if self.forward_available and self.opening_cleared:
-            self.credit_limit = self.forward_available - self.opening_cleared
-        else:
-            self.credit_limit = None
-
-        self.interest_rate = None
-        self.minimum_payment = None
-
-    def __repr__(self):
-        return f"Account='{self.account_name}' AccountType={self.account_type} Id:={self.account_id} InterimBalance={self.interim_available} CreditLimit={self.credit_limit}"
-
-    def __str__(self) -> str:
-        return f"Account: {self.account_name} Id: ({self.account_id}) Interim balance: {self.interim_available} Credit Limit: {self.credit_limit}"
-
-
-class User:
-    def __init__(self, user_name: str = "Matthew Stewart"):
-        self.user_name = user_name
-        self.bank_accounts: list[BankAccount] = []
-        self.credit_cards: list[CreditCard] = []
-
-    def add_account(self, account: Account):
-        if isinstance(account, BankAccount):
-            self.bank_accounts.append(account)
-        elif isinstance(account, CreditCard):
-            self.credit_cards.append(account)
-        else:
-            raise ValueError(f"Account type {type(account)} is not valid")
-
-    def add_accounts(self, accounts: list):
-        for account in accounts:
-            self.add_account(account)
-
-    @property
-    def accounts(self):
-        return self.bank_accounts + self.credit_cards
-
-    # @property
-    # def user_name(self):
-    #     return self.bank_accounts[0].account_name
-
-    @property
-    def currency(self):
-        return self.bank_accounts[0].currency
-
-    @property
-    def reference_date(self):
-        return self.bank_accounts[0].reference_date
-
-    def get_account(self, account_id: str):
-        for account in self.accounts:
-            if account.account_id == account_id:
-                return account
-        return None
-
-    def __repr__(self):
-        return f"User: {self.user_name} Accounts: {self.accounts}"
-
-    def __str__(self) -> str:
-        return f"User: {self.user_name} Accounts: {self.accounts}"
-
-    def to_dict(self):
-        # need to copy each account into  a dict
-
-        return_data = copy(self.__dict__)
-        # turn each copy of account in return data to dict
-        return_data["bank_accounts"] = [a.to_dict() for a in copy(self.bank_accounts)]
-        return_data["credit_cards"] = [a.to_dict() for a in copy(self.credit_cards)]
-
-    # get net balance (available balance in card + net position in credit card)
-    def get_net_balance(self):
-        net_balance = 0
-        for account in self.accounts:
-            if isinstance(account, BankAccount):
-                net_balance += account.interim_available
-            elif isinstance(account, CreditCard):
-                net_balance += account.forward_available - account.credit_limit
-        return net_balance
-
-    # suggest new funcs
-    def get_transactions_by_date(self, start_date, end_date):
-        transactions = []
-        for account in self.accounts:
-            for transaction in account.booked_transactions:
-                if (
-                    transaction.booking_date >= start_date
-                    and transaction.booking_date <= end_date
-                ):
-                    transactions.append(transaction)
-        return transactions
-
-    def get_transactions_by_amount(self, min_amount, max_amount):
-        transactions = []
-        for account in self.accounts:
-            for transaction in account.booked_transactions:
-                if (
-                    transaction.amount >= min_amount
-                    and transaction.amount <= max_amount
-                ):
-                    transactions.append(transaction)
-        return transactions
-
-    # def get_transactions_by_category(self, category):
-    #     transactions = []
-    #     for account in self.accounts:
-    #         for transaction in account.booked_transactions:
-    #             if transaction.merchant_category_code == category:
-    #                 transactions.append(transaction)
-    #     return transactions
-
-    def get_transactions_by_status(self, status):
-        transactions = []
-        for account in self.accounts:
-            for transaction in account.booked_transactions:
-                if transaction.status == status:
-                    transactions.append(transaction)
-        return transactions
-
-    def get_transactions_by_currency(self, currency):
-        transactions = []
-        for account in self.accounts:
-            for transaction in account.booked_transactions:
-                if transaction.currency == currency:
-                    transactions.append(transaction)
-        return transactions
-
-    def get_transactions_by_account(self, account_id):
-        transactions = []
-        for account in self.accounts:
-            if account.account_id == account_id:
-                transactions.append(account.booked_transactions)
-        return transactions
-
-    def get_transactions_by_date_range(self, start_date, end_date):
-        transactions = []
-        for account in self.accounts:
-            for transaction in account.booked_transactions:
-                if (
-                    transaction.booking_date >= start_date
-                    and transaction.booking_date <= end_date
-                ):
-                    transactions.append(transaction)
-        return transactions
-
-    def get_transactions_by_amount_range(self, min_amount, max_amount):
-        transactions = []
-        for account in self.accounts:
-            for transaction in account.booked_transactions:
-                if (
-                    transaction.amount >= min_amount
-                    and transaction.amount <= max_amount
-                ):
-                    transactions.append(transaction)
-        return transactions
-
-    def get_transactions(self):
-        transactions = []
-        for account in self.accounts:
-            transactions.extend(account.booked_transactions)
-        return transactions
-
-    def handle_multiple_queries(self, *queries):
-        # add docstring
-        """
-        Handle multiple queries by finding the common transactions between them.
-
-        Args:
-            *queries: A list of queries to handle.
-
-        Returns:
-            A list of transactions that are common to all queries.
-        """
-        dicts = [[d.to_dict() for d in query] for query in queries]
-        common_dicts = find_common_dicts(*dicts)
-        transactions = [Transaction(t) for t in common_dicts]
-        return transactions
-
-
 class AccountMetadata(BaseModel):
     id: str
     created: str
@@ -491,7 +196,7 @@ class CurrentAccountDetails(BaseModel):
     name: str
     cash_account_type: str
     account_id: str = Field(default_factory=lambda: None)
-    transactions: list[Transaction] = Field(default_factory=lambda: list)
+    # transactions: list[Transaction] = Field(default_factory=lambda: [])
 
 
 class CreditCardDetails(BaseModel):
@@ -550,7 +255,7 @@ class UserAccountDetails(BaseModel):
             raise TypeError("current_account must be of type CurrentAccountDetails")
         self.current_accounts[account_id] = current_account
 
-    def fetch_account_details_by_id(
+    def get_account_details_by_id(
         self, account_id: str
     ) -> CurrentAccountDetails | CreditCardDetails | None:
         account = self.current_accounts.get(account_id, None)
@@ -591,7 +296,7 @@ class Balance(BaseModel):
 class AccountBalances(BaseModel):
     account_name: str = None
     account_id: str = None
-    balances: list[Balance]
+    balances: dict[str, Balance]
 
 
 class UserAccountBalances(BaseModel):
@@ -618,10 +323,73 @@ class UserAccountBalances(BaseModel):
     def get_balances_by_account_id(self, account_id: str) -> AccountBalances | None:
         return self.balances.get(account_id, None)
 
+    def to_dict(self, account_id):
+        data = deepcopy(
+            self.get_balances_by_account_id(account_id).model_dump().get("balances")
+        )
+        for d in data:
+            d["account_id"] = account_id
+        return data
+
+    def to_dataframe(self, account_id: str) -> pd.DataFrame:
+        balances = self.to_dict(account_id)
+        if balances:
+            return pd.json_normalize(balances)
+        return None
+
 
 class UserData(BaseModel):
     requisition: Requisition
     account_metadata: UserAccountMetadata
     account_details: UserAccountDetails
     account_balances: UserAccountBalances
-    transactions: list[dict] = Field(default_factory=lambda: [])
+    transactions: list[Transaction] = Field(default_factory=lambda: [])
+
+    def get_account_transactions(self, account_id: str) -> list[Transaction]:
+        return [
+            transaction
+            for transaction in self.transactions
+            if transaction.account_id == account_id
+        ]
+
+
+def create_account_from_current_account(
+    details: CurrentAccountDetails, balances: AccountBalances
+) -> Account:
+    account = Account(
+        account_name=details.name,
+        account_type=details.cash_account_type,
+        currency=details.currency,
+        reference_date=balances.balances[0].reference_date,
+        interim_available=balances.balances[0].balance_amount.amount,
+        account_id=details.account_id,
+    )
+    return account
+
+
+class CurrentAccountBalanceTypes:
+    interim_available = "interimAvailable"
+    interim_booked = "interimBooked"
+
+
+def create_account_from_credit_card(
+    details: CreditCardDetails, balances: AccountBalances
+) -> Account:
+    forward_data: Balance = balances.balances.get("forwardAvailable")
+    opening_data: Balance = balances.balances.get("openingCleared")
+    previously_closed_data: Balance = balances.balances.get("previouslyClosedBooked")
+
+    inputs = {
+        "currency": forward_data.balance_amount.currency,
+        "reference_date": forward_data.reference_date,
+        "forward_available_balance": forward_data.balance_amount.amount,
+        "opening_cleared_balance": opening_data.balance_amount.amount,
+        "previously_closed_booked_balance": previously_closed_data.balance_amount.amount,
+        "masked_pan": details.masked_pan,
+        "account_id": details.account_id,
+        "account_name": details.details,
+        "account_type": "CREDIT_CARD",
+    }
+
+    account = Account(**inputs)
+    return account
