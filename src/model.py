@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import dataclasses
 import datetime
 from enum import Enum
-from copy import copy
+from copy import copy, deepcopy
 from collections import OrderedDict
 from numpy import isin
 from pydantic import BaseModel, Field
@@ -10,8 +10,10 @@ from dotenv import load_dotenv
 
 load_dotenv("user.env")
 
-BOOKED_TRANSACTION = "booked"
-PENDING_TRANSACTION = "pending"
+
+class TransactionType:
+    booked_transaction = "booked"
+    pending_transaction = "pending"
 
 
 # Transaction class
@@ -204,9 +206,9 @@ class Account:
                 self.pending_transactions.remove(t)
                 break
 
-        if transaction.status == BOOKED_TRANSACTION:
+        if transaction.status == TransactionType.booked_transaction:
             self.booked_transactions.append(transaction)
-        elif transaction:
+        elif transaction.status == TransactionType.pending_transaction:
             self.pending_transactions.append(transaction)
         else:
             raise ValueError(f"Transaction status {transaction.status} is not valid")
@@ -422,7 +424,10 @@ class AccountMetadata(BaseModel):
 
 
 class UserAccountMetadata(BaseModel):
-    accounts: dict[str, AccountMetadata]
+    accounts: dict[str, AccountMetadata] = Field(default_factory={})
+
+    def add_account(self, account_id: str, account_metadata: AccountMetadata):
+        self.accounts[account_id] = account_metadata
 
 
 class Requisition(BaseModel):
@@ -477,6 +482,7 @@ class CurrentAccountDetails(BaseModel):
         currency (str): The currency of the current account.
         name (str): The name of the current account.
         cash_account_type (str): The cash account type of the current account.
+        account_id (str): The account ID of the current account (key from nordigen: data).
     """
 
     resource_id: str
@@ -484,6 +490,8 @@ class CurrentAccountDetails(BaseModel):
     currency: str
     name: str
     cash_account_type: str
+    account_id: str = Field(default_factory=lambda: None)
+    transactions: list[Transaction] = Field(default_factory=lambda: list)
 
 
 class CreditCardDetails(BaseModel):
@@ -494,13 +502,14 @@ class CreditCardDetails(BaseModel):
         resource_id (str): The resource ID of the credit card.
         currency (str): The currency of the credit card.
         masked_pan (str): The masked PAN of the credit card.
-        details (str): The details of the credit card.
+        details (str): The details of the credit card (key from nordigen: data)..
     """
 
     resource_id: str
     currency: str
     masked_pan: str
     details: str
+    account_id: str = Field(default_factory=lambda: None)
 
 
 class UserAccountDetails(BaseModel):
@@ -508,22 +517,64 @@ class UserAccountDetails(BaseModel):
     Model for user account details.
 
     Args:
-        credit_cards (list[CreditCardDetails]): A list of credit card details.
-        current_accounts (list[CurrentAccountDetails]): A list of current account details.
+        credit_cards (dict[CreditCardDetails]): A dict of credit card details.
+        current_accounts (dict[CurrentAccountDetails]): A dict of current account details.
     """
 
-    credit_cards: list[CreditCardDetails] = Field(default_factory=list)
-    current_accounts: list[CurrentAccountDetails] = Field(default_factory=list)
+    credit_cards: dict[str, CreditCardDetails] = Field(default_factory=dict)
+    current_accounts: dict[str, CurrentAccountDetails] = Field(default_factory=dict)
 
-    def add_credit_card(self, credit_card: CreditCardDetails):
+    def add_account(
+        self, account_id, account: CurrentAccountDetails | CreditCardDetails
+    ):
+        if not isinstance(account, CurrentAccountDetails) and not isinstance(
+            account, CreditCardDetails
+        ):
+            raise TypeError(
+                "account must be of type CurrentAccountDetails or CreditCardDetails"
+            )
+        if isinstance(account, CurrentAccountDetails):
+            account.account_id = account_id
+            self._add_current_account(account_id, account)
+        elif isinstance(account, CreditCardDetails):
+            account.account_id = account_id
+            self._add_credit_card(account_id, account)
+
+    def _add_credit_card(self, account_id, credit_card: CreditCardDetails):
         if not isinstance(credit_card, CreditCardDetails):
             raise TypeError("credit_card must be of type CreditCardDetails")
-        self.credit_cards.append(credit_card)
+        self.credit_cards[account_id] = credit_card
 
-    def add_current_account(self, current_account: CurrentAccountDetails):
+    def _add_current_account(self, account_id, current_account: CurrentAccountDetails):
         if not isinstance(current_account, CurrentAccountDetails):
             raise TypeError("current_account must be of type CurrentAccountDetails")
-        self.current_accounts.append(current_account)
+        self.current_accounts[account_id] = current_account
+
+    def fetch_account_details_by_id(
+        self, account_id: str
+    ) -> CurrentAccountDetails | CreditCardDetails | None:
+        account = self.current_accounts.get(account_id, None)
+        if account:
+            return account
+
+        account = self.credit_cards.get(account_id, None)
+        if account:
+            return account
+
+        return None
+
+    def fetch_account_details_by_name(
+        self, account_name: str
+    ) -> CurrentAccountDetails | CreditCardDetails | None:
+        for account in self.current_accounts.values():
+            if account.name == account_name:
+                return account
+
+        for account in self.credit_cards.values():
+            if account.name == account_name:
+                return account
+
+        return None
 
 
 class BalanceAmount(BaseModel):
@@ -537,13 +588,35 @@ class Balance(BaseModel):
     reference_date: str
 
 
-class Balances(BaseModel):
+class AccountBalances(BaseModel):
+    account_name: str = None
+    account_id: str = None
     balances: list[Balance]
 
 
 class UserAccountBalances(BaseModel):
-    current_accounts: dict[str, Balances] = Field(default_factory=dict)
-    credit_cards: dict[str, Balances] = Field(default_factory=dict)
+    balances: dict[str, AccountBalances] = Field(default_factory=dict)
+
+    def set_account_balances(
+        self, account_id, balance: AccountBalances, account_name: str = None
+    ):
+        def preprocess(balance):
+            balance_to_set = deepcopy(balance)
+            balance_to_set.account_id = account_id
+            if account_name:
+                balance_to_set.account_name = account_name
+            return balance_to_set
+
+        if not isinstance(balance, AccountBalances):
+            raise TypeError("balances must be of type AccountBalances")
+
+        self.balances[account_id] = preprocess(balance)
+
+    def get_balances(self) -> list[AccountBalances]:
+        return list(self.balances.values())
+
+    def get_balances_by_account_id(self, account_id: str) -> AccountBalances | None:
+        return self.balances.get(account_id, None)
 
 
 class UserData(BaseModel):

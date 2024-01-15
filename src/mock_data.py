@@ -8,28 +8,33 @@ from pydantic import BaseModel, Field, Json
 import model
 
 
-def get_mocked_data():
-    def get_requisition() -> model.Requisition:
-        requisition: dict[str, Any] = {
-            "id": "738d03c6-96fe-4b9e-a10c-b5befb1d02c8",
-            "created": "2023-12-25T09:33:37.022127Z",
-            "redirect": "https://gocardless.com",
-            "status": "LN",
-            "institution_id": "SANTANDER_GB_ABBYGB2L",
-            "agreement": "71321e76-07d3-4438-ad18-d600ce91438c",
-            "reference": "073127d2-2018-4a4a-b47e-1170d8616228",
-            "accounts": [
-                "590300bd-3daf-4d5e-9274-7a3782261f7e",
-                "d2ff77d0-6c80-4580-95a5-e3e87a098db9",
-                "e9e5f8b9-da61-49ce-bdae-56546ce4a1c9",
-            ],
-            "link": "https://ob.nordigen.com/psd2/start/738d03c6-96fe-4b9e-a10c-b5befb1d02c8/SANTANDER_GB_ABBYGB2L",
-            "ssn": None,
-            "account_selection": False,
-            "redirect_immediate": False,
-        }
-        return model.Requisition.model_validate(requisition)
+def get_requisition() -> model.Requisition:
+    requisition: dict[str, Any] = {
+        "id": "738d03c6-96fe-4b9e-a10c-b5befb1d02c8",
+        "created": "2023-12-25T09:33:37.022127Z",
+        "redirect": "https://gocardless.com",
+        "status": "LN",
+        "institution_id": "SANTANDER_GB_ABBYGB2L",
+        "agreement": "71321e76-07d3-4438-ad18-d600ce91438c",
+        "reference": "073127d2-2018-4a4a-b47e-1170d8616228",
+        "accounts": [
+            "590300bd-3daf-4d5e-9274-7a3782261f7e",
+            "d2ff77d0-6c80-4580-95a5-e3e87a098db9",
+            "e9e5f8b9-da61-49ce-bdae-56546ce4a1c9",
+        ],
+        "link": "https://ob.nordigen.com/psd2/start/738d03c6-96fe-4b9e-a10c-b5befb1d02c8/SANTANDER_GB_ABBYGB2L",
+        "ssn": None,
+        "account_selection": False,
+        "redirect_immediate": False,
+    }
+    return model.Requisition.model_validate(requisition)
 
+
+def load_data():
+    return utils.read_json(filepath="../data/api_output_sample.json"), get_requisition()
+
+
+def get_mocked_data():
     def get_metadata() -> model.UserAccountMetadata:
         # as dicts
         joint_account_metadata = {
@@ -155,9 +160,9 @@ def get_mocked_data():
         )
 
         account_details = model.UserAccountDetails()
-        account_details.add_credit_card(credit_card_details)
-        account_details.add_current_account(joint_account_details)
-        account_details.add_current_account(single_account_details)
+        account_details._add_credit_card(credit_card_details)
+        account_details._add_current_account(joint_account_details)
+        account_details._add_current_account(single_account_details)
         return account_details
 
     def get_balances():
@@ -257,19 +262,19 @@ def get_mocked_data():
         )
 
         # as objects
-        joint_account_balances = model.Balances(
+        joint_account_balances = model.AccountBalances(
             balances=get_balances(joint_account_balances)
         )
-        credit_card_balances = model.Balances(
+        credit_card_balances = model.AccountBalances(
             balances=get_balances(credit_card_balances)
         )
-        single_account_balances = model.Balances(
+        single_account_balances = model.AccountBalances(
             balances=get_balances(single_account_balances)
         )
 
         account_balances = model.UserAccountBalances(
-            current_accounts={"joint_account": joint_account_balances},
-            credit_cards={"credit_card": credit_card_balances},
+            current_accounts=[single_account_balances, joint_account_balances],
+            credit_cards=[credit_card_balances],
         )
         return account_balances
 
