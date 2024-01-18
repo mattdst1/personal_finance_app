@@ -51,6 +51,7 @@ def enrich_transactions(transactions=list[model.Transaction]):
     enriched_transactions = [
         model.Transaction(**d) for d in enriched_df.to_dict(orient="records")
     ]
+    df = df.drop_duplicates().dropna(axis=1)
     return enriched_transactions
 
 
