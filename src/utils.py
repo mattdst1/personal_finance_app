@@ -1,7 +1,16 @@
 import json
+import yaml
+
+from pathlib import Path
 
 
-def read_json(filepath):
+def read_yaml(yaml_path):
+    with open(yaml_path, "r") as file:
+        yaml_data = yaml.safe_load(file)
+    return yaml_data
+
+
+def read_json(filepath) -> None | list[dict] | list | list[dict]:
     filepath = str(filepath)
 
     try:
@@ -14,6 +23,11 @@ def read_json(filepath):
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON in file {filepath}: {e}")
         return None
+
+
+def save_data_to_json(data_object: list | list[dict], filepath: Path):
+    with open(filepath, "w") as file:
+        json.dump(data_object, file)
 
 
 def to_snake_case_with_dots(column_name):
@@ -102,3 +116,18 @@ def rename_keys(data, mapping):
     for key, value in mapping.items():
         data[value] = data.pop(key)
     return data
+
+
+def clean_text_field(text: str) -> str:
+    text = (
+        text.replace("description:", "").replace("ref.", "ref ").replace("&amp;", " ")
+    )
+
+    text = text.lower()
+    return text
+
+
+def today():
+    from datetime import datetime
+
+    return datetime.today().strftime("%Y-%m-%d")

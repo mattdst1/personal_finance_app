@@ -39,6 +39,7 @@ def load_user_data(filepath: Path = mock_data.MOCK_PATH):
         # parse details and account account name
         parsed_account_details = data_parsers.parse_account_details(account_data)
         account_name = parse_account_name(parsed_account_details)
+        account_type = account_data.get("account").get("cashAccountType")
 
         # update user details
         details.add_account(
@@ -55,7 +56,10 @@ def load_user_data(filepath: Path = mock_data.MOCK_PATH):
 
         # update user transactions
         account_transactions = data_parsers.parse_account_transactions(
-            account_data=account_data, account_id=account_id, account_name=account_name
+            account_data=account_data,
+            account_id=account_id,
+            account_name=account_name,
+            account_type=account_type,
         )
         transactions.extend(account_transactions)
 

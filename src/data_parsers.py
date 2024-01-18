@@ -75,7 +75,9 @@ def parse_account_balances(account_data):
     return model.AccountBalances(balances=get_balances(balance_data))
 
 
-def parse_account_transactions(account_data, account_id, account_name=None):
+def parse_account_transactions(
+    account_data, account_id, account_name=None, account_type=None
+):
     """
     Process account level transactions where account_data = data.get(account_id)
 
@@ -90,6 +92,8 @@ def parse_account_transactions(account_data, account_id, account_name=None):
         pending["status"] = "pending"
     df = pd.concat([booked, pending])
     df["account_id"] = account_id
+    if account_type:
+        df["account_type"] = account_type
 
     if account_name:
         df["account_name"] = account_name

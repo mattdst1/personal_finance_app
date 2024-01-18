@@ -21,6 +21,7 @@ class TransactionType:
 # Transaction class
 @dataclass
 class Transaction:
+    # from api
     booking_date: str = None
     booking_date_time: str = None
     remittance_information_unstructured: str = None
@@ -46,6 +47,14 @@ class Transaction:
     quotation_date: str = None
     value_date: str = None
     value_date_time: str = None
+
+    # from enrichment
+    booking_year: int = None
+    booking_month: int = None
+    flow: str = None
+    counterparty: str = None
+    category: str = None
+    year_month: str = None
 
     def enforce_types(self):
         # convert str to float
@@ -196,7 +205,6 @@ class CurrentAccountDetails(BaseModel):
     name: str
     cash_account_type: str
     account_id: str = Field(default_factory=lambda: None)
-    # transactions: list[Transaction] = Field(default_factory=lambda: [])
 
 
 class CreditCardDetails(BaseModel):
@@ -215,6 +223,7 @@ class CreditCardDetails(BaseModel):
     masked_pan: str
     details: str
     account_id: str = Field(default_factory=lambda: None)
+    cash_account_type: str = "CARD"
 
 
 class UserAccountDetails(BaseModel):
@@ -340,9 +349,9 @@ class UserAccountBalances(BaseModel):
 
 class UserData(BaseModel):
     requisition: Requisition
-    account_metadata: UserAccountMetadata
-    account_details: UserAccountDetails
-    account_balances: UserAccountBalances
+    account_metadata: UserAccountMetadata = None
+    account_details: UserAccountDetails = None
+    account_balances: UserAccountBalances = None
     transactions: list[Transaction] = Field(default_factory=lambda: [])
 
     def get_account_transactions(self, account_id: str) -> list[Transaction]:
@@ -352,44 +361,19 @@ class UserData(BaseModel):
             if transaction.account_id == account_id
         ]
 
+    def query_transactions_by_transaction_code(
+        self, proprietary_bank_transaction_code: str
+    ):
+        records = [
+            d
+            for d in self.transactions
+            if d.proprietary_bank_transaction_code == proprietary_bank_transaction_code
+        ]
 
-def create_account_from_current_account(
-    details: CurrentAccountDetails, balances: AccountBalances
-) -> Account:
-    account = Account(
-        account_name=details.name,
-        account_type=details.cash_account_type,
-        currency=details.currency,
-        reference_date=balances.balances[0].reference_date,
-        interim_available=balances.balances[0].balance_amount.amount,
-        account_id=details.account_id,
-    )
-    return account
+        print(f"Found {len(records)} records")
+        return records
 
 
 class CurrentAccountBalanceTypes:
     interim_available = "interimAvailable"
     interim_booked = "interimBooked"
-
-
-def create_account_from_credit_card(
-    details: CreditCardDetails, balances: AccountBalances
-) -> Account:
-    forward_data: Balance = balances.balances.get("forwardAvailable")
-    opening_data: Balance = balances.balances.get("openingCleared")
-    previously_closed_data: Balance = balances.balances.get("previouslyClosedBooked")
-
-    inputs = {
-        "currency": forward_data.balance_amount.currency,
-        "reference_date": forward_data.reference_date,
-        "forward_available_balance": forward_data.balance_amount.amount,
-        "opening_cleared_balance": opening_data.balance_amount.amount,
-        "previously_closed_booked_balance": previously_closed_data.balance_amount.amount,
-        "masked_pan": details.masked_pan,
-        "account_id": details.account_id,
-        "account_name": details.details,
-        "account_type": "CREDIT_CARD",
-    }
-
-    account = Account(**inputs)
-    return account
