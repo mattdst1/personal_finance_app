@@ -93,7 +93,7 @@ class Transaction:
         self.enforce_types()
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data, **kwargs):
         return cls(**data)
 
     # return as dict
@@ -345,6 +345,7 @@ class UserAccountBalances(BaseModel):
         if balances:
             return pd.json_normalize(balances)
         return None
+
 
 
 class UserData(BaseModel):

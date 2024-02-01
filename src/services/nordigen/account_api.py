@@ -228,7 +228,10 @@ async def get_latest_data(requisition_id: str):
 
     # get requisition
     requisition = load_requisition(requisition_id=requisition_id)
-    account_ids = requisition.get("accounts")
+    account_ids = requisition.get(requisition_id, {}).get("accounts", [])
+
+    if not account_ids:
+        raise ValueError("no accounts found")
 
     # get static data
     account_details_dict = load_acount_details(account_ids=account_ids, overwrite=False)
@@ -242,6 +245,7 @@ async def get_latest_data(requisition_id: str):
         account_transactions_dict,
     ) = await load_latest_account_data(requisition_id=requisition_id, overwrite=True)
 
+    # try:
     # package data
     data = {
         id: {
@@ -256,3 +260,13 @@ async def get_latest_data(requisition_id: str):
     # save
     utils.save_data_to_json(data, get_output_filepath())
     return get_output_filepath()
+
+    # except Exception as e:
+    #     logger.error(e)
+    #     return (
+    #         requisition,
+    #         account_metadata_dict,
+    #         account_balances_dict,
+    #         account_transactions_dict,
+    #         account_details_dict,
+    #     )

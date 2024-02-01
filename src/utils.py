@@ -131,3 +131,30 @@ def today():
     from datetime import datetime
 
     return datetime.today().strftime("%Y-%m-%d")
+
+
+def get_flow(amount: float):
+    if amount > 0:
+        return "credit"
+    elif amount < 0:
+        return "debit"
+    else:
+        raise ValueError()
+
+
+def get_amount(amount: float):
+    if amount > 0:
+        return amount
+    elif amount < 0:
+        return -amount
+    else:
+        raise ValueError()
+
+
+def get_balance(balance: float):
+    if balance > 0:
+        return balance
+    elif balance < 0:
+        return -balance
+    else:
+        raise ValueError()

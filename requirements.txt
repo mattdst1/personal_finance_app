@@ -1,0 +1,11 @@
+gradio
+pydantic
+pandas
+nordigen
+jupyter
+numpy
+pydotenv
+fastapi
+python-dotenv
+loguru
+aiohttp
